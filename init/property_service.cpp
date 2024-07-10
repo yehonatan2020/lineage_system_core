@@ -1428,6 +1428,8 @@ static void SetSafetyNetProps() {
     InitPropertySet("ro.boot.warranty_bit", "0");
     InitPropertySet("ro.warranty_bit", "0");
     InitPropertySet("ro.debuggable", "0");
+    InitPropertySet("ro.force.debuggable", "0");
+    InitPropertySet("ro.adb.secure", "1");
     InitPropertySet("ro.secure", "1");
     InitPropertySet("ro.bootimage.build.type", "user");
     InitPropertySet("ro.build.type", "user");
