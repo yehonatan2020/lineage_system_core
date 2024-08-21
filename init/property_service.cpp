@@ -413,7 +413,7 @@ static std::optional<uint32_t> PropertySet(const std::string& name, const std::s
         prop_info* pi = (prop_info*)__system_property_find(name.c_str());
         if (pi != nullptr) {
             // ro.* properties are actually "write-once", unless the system decides to
-        if (StartsWith(name, "ro.") && !weaken_prop_override_security) {
+            if (StartsWith(name, "ro.") && !weaken_prop_override_security) {
                 *error = "Read-only property was already set";
                 return {PROP_ERROR_READ_ONLY_PROPERTY};
             }
@@ -875,94 +875,6 @@ static void load_override_properties() {
     }
 }
 
-static const char *snet_prop_key[] = {
-    "ro.boot.vbmeta.device_state",
-    "ro.boot.verifiedbootstate",
-    "ro.boot.flash.locked",
-    "ro.boot.selinux",
-    "ro.boot.veritymode",
-    "ro.boot.warranty_bit",
-    "ro.warranty_bit",
-    "ro.debuggable",
-    "ro.secure",
-    "ro.build.type",
-    "ro.system.build.type",
-    "ro.system_ext.build.type",
-    "ro.vendor.build.type",
-    "ro.product.build.type",
-    "ro.odm.build.type",
-    "ro.build.keys",
-    "ro.build.tags",
-    "ro.system.build.tags",
-    "ro.vendor.boot.warranty_bit",
-    "ro.vendor.warranty_bit",
-    "vendor.boot.vbmeta.device_state",
-    "vendor.boot.verifiedbootstate",
-    NULL
-};
-
-static const char *snet_prop_value[] = {
-    "locked", // ro.boot.vbmeta.device_state
-    "green", // ro.boot.verifiedbootstate
-    "1", // ro.boot.flash.locked
-    "enforcing", // ro.boot.selinux
-    "enforcing", // ro.boot.veritymode
-    "0", // ro.boot.warranty_bit
-    "0", // ro.warranty_bit
-    "0", // ro.debuggable
-    "1", // ro.secure
-    "user", // ro.build.type
-    "user", // ro.system.build.type
-    "user", // ro.system_ext.build.type
-    "user", // ro.vendor.build.type
-    "user", // ro.product.build.type
-    "user", // ro.odm.build.type
-    "release-keys", // ro.build.keys
-    "release-keys", // ro.build.tags
-    "release-keys", // ro.system.build.tags
-    "0", // ro.vendor.boot.warranty_bit
-    "0", // ro.vendor.warranty_bit
-    "locked", // vendor.boot.vbmeta.device_state
-    "green", // vendor.boot.verifiedbootstate
-    NULL
-};
-
-static void workaround_snet_properties() {
-    std::string build_type = android::base::GetProperty("ro.build.type", "");
-
-    // Bail out if this is recovery, fastbootd, or anything other than a normal boot.
-    // fastbootd, in particular, needs the real values so it can allow flashing on
-    // unlocked bootloaders.
-    if (IsRecoveryMode()) {
-        return;
-    }
-
-    // Exit if eng build
-    if (build_type == "eng") {
-        return;
-    }
-
-    // Weaken property override security to set safetynet props
-    weaken_prop_override_security = true;
-
-    std::string error;
-
-    // Hide all sensitive props 
-    LOG(INFO) << "snet: Hiding sensitive props";
-    for (int i = 0; snet_prop_key[i]; ++i) {
-        PropertySetNoSocket(snet_prop_key[i], snet_prop_value[i], &error);
-    }
-
-    // Extra pops
-    std::string build_flavor_key = "ro.build.flavor";
-    std::string build_flavor_value = android::base::GetProperty(build_flavor_key, "");
-    build_flavor_value = android::base::StringReplace(build_flavor_value, "userdebug", "user", false);
-    PropertySetNoSocket(build_flavor_key, build_flavor_value, &error);
-
-    // Restore the normal property override security after safetynet props have been set
-    weaken_prop_override_security = false;
-}
-
 // If the ro.product.[brand|device|manufacturer|model|name] properties have not been explicitly
 // set, derive them from ro.product.${partition}.* properties
 static void property_initialize_ro_product_props() {
@@ -1332,9 +1244,6 @@ void PropertyLoadBootDefaults() {
     weaken_prop_override_security = false;
 
     update_sys_usb_config();
-
-    // Workaround SafetyNet
-    workaround_snet_properties();
 }
 
 bool LoadPropertyInfoFromFile(const std::string& filename,
@@ -1484,6 +1393,8 @@ static void SetSafetyNetProps() {
     InitPropertySet("ro.boot.flash.locked", "1");
     InitPropertySet("ro.boot.vbmeta.device_state", "locked");
     InitPropertySet("ro.boot.verifiedbootstate", "green");
+    InitPropertySet("ro.boot.flash.locked", "1");
+    InitPropertySet("ro.boot.selinux", "enforcing");
     InitPropertySet("ro.boot.veritymode", "enforcing");
     InitPropertySet("ro.boot.warranty_bit", "0");
     InitPropertySet("ro.warranty_bit", "0");
@@ -1491,20 +1402,29 @@ static void SetSafetyNetProps() {
     InitPropertySet("ro.secure", "1");
     InitPropertySet("ro.bootimage.build.type", "user");
     InitPropertySet("ro.build.type", "user");
-    InitPropertySet("ro.build.keys", "release-keys");
-    InitPropertySet("ro.build.tags", "release-keys");
-    InitPropertySet("ro.system.build.tags", "release-keys");
-    InitPropertySet("ro.product.build.type", "user");
-    InitPropertySet("ro.odm.build.type", "user");
     InitPropertySet("ro.system.build.type", "user");
     InitPropertySet("ro.system_ext.build.type", "user");
     InitPropertySet("ro.vendor.build.type", "user");
     InitPropertySet("ro.vendor_dlkm.build.type", "user");
+    InitPropertySet("ro.product.build.type", "user");
+    InitPropertySet("ro.odm.build.type", "user");
+    InitPropertySet("ro.build.keys", "release-keys");
+    InitPropertySet("ro.build.tags", "release-keys");
+    InitPropertySet("ro.bootimage.build.tags", "release-keys");
+    InitPropertySet("ro.odm.build.tags", "release-keys");
+    InitPropertySet("ro.product.build.tags", "release-keys");
+    InitPropertySet("ro.system.build.tags", "release-keys");
+    InitPropertySet("ro.system_ext.build.tags", "release-keys");
+    InitPropertySet("ro.vendor.build.tags", "release-keys");
+    InitPropertySet("ro.vendor_dlkm.build.tags", "release-keys");
     InitPropertySet("ro.vendor.boot.warranty_bit", "0");
     InitPropertySet("ro.vendor.warranty_bit", "0");
     InitPropertySet("vendor.boot.vbmeta.device_state", "locked");
     InitPropertySet("vendor.boot.verifiedbootstate", "green");
     InitPropertySet("oplusboot.verifiedbootstate", "green");
+#ifdef SPOOF_FIRST_API_LEVEL_32
+    InitPropertySet("ro.product.first_api_level", "32");
+#endif
 }
 
 void PropertyInit() {
